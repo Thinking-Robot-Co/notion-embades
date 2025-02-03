@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Project Launcher</title>
+  <style>
+    /* Base styles for the body */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Container to center content */
+    .container {
+      max-width: 1200px;
+      margin: 50px auto;
+      padding: 0 20px;
+    }
+
+    /* Create a responsive grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+    }
+
+    /* Style for the button links */
+    .btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    /* Hover effect */
+    .btn:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Icon styling */
+    .btn img {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 10px;
+    }
+
+    /* Title styling */
+    .btn span {
+      font-size: 1.1em;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="grid">
+      <!-- Tracker Button -->
+      <a href="tracker/tracker.html" class="btn">
+        <img src="tracker.png" alt="Tracker Icon" />
+        <span>Tracker</span>
+      </a>
+      
+      <!-- Dashboard Button -->
+      <a href="dashboard/dashboard.html" class="btn">
+        <img src="dashboard.png" alt="Dashboard Icon" />
+        <span>Dashboard</span>
+      </a>
+      
+      <!-- Reports Button -->
+      <a href="reports/reports.html" class="btn">
+        <img src="reports.png" alt="Reports Icon" />
+        <span>Reports</span>
+      </a>
+      
+      <!-- Settings Button -->
+      <a href="settings/settings.html" class="btn">
+        <img src="settings.png" alt="Settings Icon" />
+        <span>Settings</span>
+      </a>
+      
+      <!-- Profile Button -->
+      <a href="profile/profile.html" class="btn">
+        <img src="profile.png" alt="Profile Icon" />
+        <span>Profile</span>
+      </a>
+      
+      <!-- Help Button -->
+      <a href="help/help.html" class="btn">
+        <img src="help.png" alt="Help Icon" />
+        <span>Help</span>
+      </a>
+      
+      <!-- Analytics Button -->
+      <a href="analytics/analytics.html" class="btn">
+        <img src="analytics.png" alt="Analytics Icon" />
+        <span>Analytics</span>
+      </a>
+      
+      <!-- Contacts Button -->
+      <a href="contacts/contacts.html" class="btn">
+        <img src="contacts.png" alt="Contacts Icon" />
+        <span>Contacts</span>
+      </a>
+      
+      <!-- Calendar Button -->
+      <a href="calendar/calendar.html" class="btn">
+        <img src="calendar.png" alt="Calendar Icon" />
+        <span>Calendar</span>
+      </a>
+      
+      <!-- Notes Button -->
+      <a href="notes/notes.html" class="btn">
+        <img src="notes.png" alt="Notes Icon" />
+        <span>Notes</span>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

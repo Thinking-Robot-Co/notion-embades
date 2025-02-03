@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cool Habit Tracker</title>
+  <style>
+    /* Global Reset & Dark Mode Styles */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #121212;
+      font-family: 'Arial', sans-serif;
+      color: #e0e0e0;
+      line-height: 1.4;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px; /* compact container for Notion embed */
+      margin: 30px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2rem;
+      color: #fff;
+    }
+    .quote {
+      text-align: center;
+      font-style: italic;
+      margin-bottom: 20px;
+      color: #aaa;
+    }
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .view-toggle button {
+      margin: 0 5px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .view-toggle button:hover {
+      background: #0056b3;
+    }
+    /* Add Habit */
+    .add-habit {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .add-habit input {
+      padding: 10px;
+      width: 250px;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 16px;
+    }
+    .add-habit button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      border: none;
+      border-radius: 5px;
+      background: #28a745;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .add-habit button:hover {
+      background: #1e7e34;
+    }
+    /* Cards Container & Habit Cards */
+    .cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .habit-card {
+      background: #2a2a2a;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      position: relative;
+      cursor: grab;
+      transition: transform 0.2s;
+    }
+    .habit-card:active { cursor: grabbing; }
+    .habit-card.dragging { opacity: 0.5; }
+    .habit-card .habit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .habit-card .habit-title {
+      font-size: 1.3rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .habit-card .habit-title:hover {
+      color: #007bff;
+    }
+    /* Date Blocks */
+    .date-blocks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .date-block {
+      flex: 1 0 60px;
+      max-width: 60px;
+      padding: 5px;
+      text-align: center;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.3s, color 0.3s;
+    }
+    .date-block.done {
+      background: #28a745;
+      color: #fff;
+      font-weight: bold;
+    }
+    /* Graph Canvas */
+    #graphCanvas {
+      display: block;
+      margin: 30px auto 0 auto;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cool Habit Tracker</h1>
+    <div class="quote" id="quote"></div>
+    <!-- Controls: Only view toggle remains -->
+    <div class="controls">
+      <div class="view-toggle">
+        <button id="weeklyViewBtn">Weekly View</button>
+        <button id="monthlyViewBtn">Monthly View</button>
+      </div>
+    </div>
+    <!-- Add Habit -->
+    <div class="add-habit">
+      <input type="text" id="newHabitInput" placeholder="New Habit" />
+      <button onclick="addHabit()">Add Habit</button>
+    </div>
+    <!-- Habit Cards -->
+    <div class="cards-container" id="cardsContainer">
+      <!-- Habit cards will be rendered here -->
+    </div>
+    <!-- Global Graph Canvas -->
+    <canvas id="graphCanvas"></canvas>
+  </div>
+
+  <script>
+    /*************************************
+     * 1. Setup: Quotes & Default Habits *
+     *************************************/
+    const quotes = [
+      "Believe you can and you're halfway there.",
+      "The only way to do great work is to love what you do.",
+      "Don't watch the clock; do what it does. Keep going.",
+      "The secret of getting ahead is getting started.",
+      "It always seems impossible until it's done."
+    ];
+    document.getElementById("quote").textContent =
+      quotes[Math.floor(Math.random() * quotes.length)];
+
+    /*************************************
+     * 2. Global Variables & Local Storage *
+     *************************************/
+    let currentView = "weekly"; // "weekly" or "monthly"
+
+    // Load data from localStorage
+    let habitData = JSON.parse(localStorage.getItem("habitTrackerData")) || {};
+    let habitOrder = JSON.parse(localStorage.getItem("habitTrackerOrder")) || [];
+
+    // Only add default habits if nothing was stored before.
+    if (localStorage.getItem("habitTrackerData") === null) {
+      const defaultHabits = ["Reading", "Workout", "Meditation"];
+      defaultHabits.forEach(habit => {
+        habitData[habit] = {};
+        habitOrder.push(habit);
+      });
+      saveData();
+    }
+
+    function saveData() {
+      localStorage.setItem("habitTrackerData", JSON.stringify(habitData));
+      localStorage.setItem("habitTrackerOrder", JSON.stringify(habitOrder));
+    }
+
+    /*************************************
+     * 3. Date Helpers                   *
+     *************************************/
+    function getDateRange() {
+      const dates = [];
+      const today = new Date();
+      if (currentView === "weekly") {
+        // Start week on Sunday
+        const dayOfWeek = today.getDay();
+        const sunday = new Date(today);
+        sunday.setDate(today.getDate() - dayOfWeek);
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(sunday);
+          date.setDate(sunday.getDate() + i);
+          dates.push(date);
+        }
+      } else if (currentView === "monthly") {
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        for (let d = firstDay.getDate(); d <= lastDay.getDate(); d++) {
+          dates.push(new Date(year, month, d));
+        }
+      }
+      return dates;
+    }
+
+    function formatDate(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function formatDateDisplay(date) {
+      // In monthly view, show only the day number.
+      if (currentView === "monthly") {
+        return date.getDate();
+      } else {
+        const options = { weekday: 'short', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString(undefined, options);
+      }
+    }
+
+    /*************************************
+     * 4. Render Habit Cards              *
+     *************************************/
+    function renderCards() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
+      const dates = getDateRange();
+
+      habitOrder.forEach(habit => {
+        const card = document.createElement("div");
+        card.className = "habit-card";
+        card.setAttribute("draggable", "true");
+        // Drag events for reordering
+        card.addEventListener("dragstart", dragStart);
+        card.addEventListener("dragover", dragOver);
+        card.addEventListener("drop", dragDrop);
+        card.addEventListener("dragend", dragEnd);
+
+        // Habit Header with Title & Right-Click Delete
+        const header = document.createElement("div");
+        header.className = "habit-header";
+        const title = document.createElement("div");
+        title.className = "habit-title";
+        title.textContent = habit;
+        title.addEventListener("contextmenu", function(e) {
+          e.preventDefault();
+          if (confirm("Delete habit '" + habit + "'?")) {
+            deleteHabit(habit);
+          }
+        });
+        header.appendChild(title);
+        card.appendChild(header);
+
+        // Date Blocks for this habit
+        const dateBlocks = document.createElement("div");
+        dateBlocks.className = "date-blocks";
+        dates.forEach(date => {
+          const block = document.createElement("div");
+          block.className = "date-block";
+          block.textContent = formatDateDisplay(date);
+          const dateStr = formatDate(date);
+          if (habitData[habit][dateStr]) { block.classList.add("done"); }
+          block.addEventListener("click", function() {
+            habitData[habit][dateStr] = !habitData[habit][dateStr];
+            saveData();
+            renderCards();
+            renderGraph();
+          });
+          dateBlocks.appendChild(block);
+        });
+        card.appendChild(dateBlocks);
+        container.appendChild(card);
+      });
+      // After updating cards, update the graph.
+      renderGraph();
+    }
+
+    /*************************************
+     * 5. Graph Rendering                 *
+     *************************************/
+    function renderGraph() {
+      const canvas = document.getElementById("graphCanvas");
+      const ctx = canvas.getContext("2d");
+      // Set canvas dimensions based on container width
+      const containerWidth = document.querySelector(".container").clientWidth;
+      canvas.width = containerWidth - 40; // leave some margin
+      canvas.height = 150;
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const dates = getDateRange();
+      const pointCount = dates.length;
+      const maxPossible = habitOrder.length; // maximum tasks per day
+
+      // Compute data: for each day, count completed tasks
+      const dataPoints = dates.map(date => {
+        const dateStr = formatDate(date);
+        let count = 0;
+        habitOrder.forEach(habit => {
+          if (habitData[habit][dateStr]) count++;
+        });
+        return count;
+      });
+
+      // Define margins for graph drawing
+      const margin = 40;
+      const graphWidth = canvas.width - 2 * margin;
+      const graphHeight = canvas.height - 2 * margin;
+      const pointSpacing = pointCount > 1 ? graphWidth / (pointCount - 1) : graphWidth;
+
+      // Draw horizontal grid lines for each value from 0 to maxPossible
+      ctx.strokeStyle = "#444";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= maxPossible; i++) {
+        const y = margin + graphHeight - (i / maxPossible) * graphHeight;
+        ctx.beginPath();
+        ctx.moveTo(margin, y);
+        ctx.lineTo(margin + graphWidth, y);
+        ctx.stroke();
+      }
+
+      // Draw the line graph
+      ctx.beginPath();
+      ctx.strokeStyle = "#00c6ff";
+      ctx.lineWidth = 3;
+      dataPoints.forEach((value, i) => {
+        const x = margin + i * pointSpacing;
+        const y = margin + graphHeight - (value / maxPossible) * graphHeight;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      // Draw data points as circles
+      ctx.fillStyle = "#0072ff";
+      dataPoints.forEach((value, i) => {
+        const x = margin + i * pointSpacing;
+        const y = margin + graphHeight - (value / maxPossible) * graphHeight;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+
+      // Draw x-axis labels
+      ctx.fillStyle = "#ccc";
+      ctx.font = "12px Arial";
+      ctx.textAlign = "center";
+      if (currentView === "monthly") {
+        // For monthly view, display just day numbers...
+        dates.forEach((date, i) => {
+          const x = margin + i * pointSpacing;
+          const label = date.getDate();
+          ctx.fillText(label, x, canvas.height - 10);
+        });
+        // ...and draw the month name at the far right.
+        const monthName = dates[0].toLocaleDateString(undefined, { month: 'short' });
+        ctx.fillText(monthName, margin + graphWidth, canvas.height - 25);
+      } else {
+        // Weekly view: show full short labels.
+        dates.forEach((date, i) => {
+          const x = margin + i * pointSpacing;
+          const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          ctx.fillText(label, x, canvas.height - 10);
+        });
+      }
+
+      // Draw y-axis labels (0 to max)
+      ctx.fillStyle = "#ccc";
+      ctx.textAlign = "right";
+      for (let i = 0; i <= maxPossible; i++) {
+        const y = margin + graphHeight - (i / maxPossible) * graphHeight;
+        ctx.fillText(i, margin - 5, y + 4);
+      }
+    }
+
+    /*************************************
+     * 6. Drag & Drop Reordering          *
+     *************************************/
+    let draggedCard = null;
+    function dragStart(e) {
+      draggedCard = this;
+      this.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    }
+    function dragOver(e) {
+      e.preventDefault();
+      this.classList.add("drag-over");
+      return false;
+    }
+    function dragDrop(e) {
+      e.stopPropagation();
+      if (draggedCard !== this) {
+        const cards = Array.from(document.querySelectorAll(".habit-card"));
+        const fromIndex = cards.indexOf(draggedCard);
+        const toIndex = cards.indexOf(this);
+        if (fromIndex >= 0 && toIndex >= 0) {
+          habitOrder.splice(toIndex, 0, habitOrder.splice(fromIndex, 1)[0]);
+          saveData();
+          renderCards();
+        }
+      }
+      return false;
+    }
+    function dragEnd() {
+      this.classList.remove("dragging");
+      document.querySelectorAll(".habit-card").forEach(card => card.classList.remove("drag-over"));
+    }
+
+    /*************************************
+     * 7. Habit Management               *
+     *************************************/
+    function addHabit() {
+      const input = document.getElementById("newHabitInput");
+      const habitName = input.value.trim();
+      if (habitName && !habitData[habitName]) {
+        habitData[habitName] = {};
+        habitOrder.push(habitName);
+        input.value = "";
+        saveData();
+        renderCards();
+      } else if (habitData[habitName]) {
+        alert("Habit already exists!");
+      }
+    }
+    function deleteHabit(habit) {
+      delete habitData[habit];
+      habitOrder = habitOrder.filter(h => h !== habit);
+      saveData();
+      renderCards();
+    }
+
+    /*************************************
+     * 8. Event Listeners for Controls   *
+     *************************************/
+    document.getElementById("weeklyViewBtn").addEventListener("click", function() {
+      currentView = "weekly";
+      renderCards();
+    });
+    document.getElementById("monthlyViewBtn").addEventListener("click", function() {
+      currentView = "monthly";
+      renderCards();
+    });
+
+    // Initial render
+    renderCards();
+  </script>
+</body>
+</html>
