@@ -99,19 +99,54 @@
     }
     .habit-card:active { cursor: grabbing; }
     .habit-card.dragging { opacity: 0.5; }
-    .habit-card .habit-header {
+    /* Habit Header with Icon, Title & Delete Icon */
+    .habit-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
     }
-    .habit-card .habit-title {
+    .habit-header-left {
+      display: flex;
+      align-items: center;
+    }
+    .habit-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .habit-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+    .habit-icon span {
+      font-size: 1rem;
+      color: #fff;
+    }
+    .habit-title {
       font-size: 1.3rem;
       font-weight: bold;
-      cursor: pointer;
+      cursor: default;
     }
-    .habit-card .habit-title:hover {
-      color: #007bff;
+    .habit-delete {
+      font-size: 1.2rem;
+      color: #ff4d4d;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: background 0.2s;
+    }
+    .habit-delete:hover {
+      background: #ff4d4d33;
     }
     /* Date Blocks */
     .date-blocks {
@@ -144,6 +179,85 @@
       border: 1px solid #444;
       border-radius: 5px;
     }
+    /* Modal Styles */
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .modal-content {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+    .modal-header {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .modal-tabs {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .modal-tabs button {
+      margin: 0 5px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .modal-tabs button.active {
+      background: #007bff;
+    }
+    .modal-body {
+      display: none;
+    }
+    .modal-body.active {
+      display: block;
+    }
+    .modal-footer {
+      text-align: right;
+      margin-top: 10px;
+    }
+    .modal-footer button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 5px;
+    }
+    .modal-footer .save-btn {
+      background: #28a745;
+      color: #fff;
+    }
+    .modal-footer .cancel-btn {
+      background: #ff4d4d;
+      color: #fff;
+    }
+    .modal input[type="text"],
+    .modal input[type="url"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background: #1e1e1e;
+      color: #fff;
+    }
+    .modal input[type="file"] {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -170,6 +284,28 @@
     <canvas id="graphCanvas"></canvas>
   </div>
 
+  <!-- Modal for Setting Icon -->
+  <div id="iconModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header" id="modalHeader">Set Icon</div>
+      <div class="modal-tabs">
+        <button id="emojiTab" class="active">Emoji</button>
+        <button id="uploadTab">Upload/Link</button>
+      </div>
+      <div id="emojiBody" class="modal-body active">
+        <input type="text" id="modalEmojiInput" placeholder="Enter an emoji" maxlength="2" />
+      </div>
+      <div id="uploadBody" class="modal-body">
+        <input type="file" id="modalFileInput" accept="image/*" />
+        <input type="url" id="modalLinkInput" placeholder="Or enter image URL" />
+      </div>
+      <div class="modal-footer">
+        <button class="cancel-btn" id="modalCancelBtn">Cancel</button>
+        <button class="save-btn" id="modalSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /*************************************
      * 1. Setup: Quotes & Default Habits *
@@ -188,20 +324,37 @@
      * 2. Global Variables & Local Storage *
      *************************************/
     let currentView = "weekly"; // "weekly" or "monthly"
+    let currentHabitForIcon = null;  // to know which habit is being edited
 
-    // Load data from localStorage
+    /* 
+      habitData structure:
+      {
+        "Reading": { 
+           dates: { "YYYY-MM-DD": true, ... },
+           icon: "https://example.com/icon.png"  // or an emoji (e.g., "😀")
+        },
+        ...
+      }
+    */
     let habitData = JSON.parse(localStorage.getItem("habitTrackerData")) || {};
     let habitOrder = JSON.parse(localStorage.getItem("habitTrackerOrder")) || [];
 
-    // Only add default habits if nothing was stored before.
+    // Only add default habits if no data exists.
     if (localStorage.getItem("habitTrackerData") === null) {
       const defaultHabits = ["Reading", "Workout", "Meditation"];
       defaultHabits.forEach(habit => {
-        habitData[habit] = {};
+        habitData[habit] = { dates: {}, icon: "" };
         habitOrder.push(habit);
       });
       saveData();
     }
+
+    // Upgrade older data: Ensure each habit has a "dates" property.
+    habitOrder.forEach(habit => {
+      if (!habitData[habit] || typeof habitData[habit].dates !== "object") {
+        habitData[habit] = { dates: {}, icon: "" };
+      }
+    });
 
     function saveData() {
       localStorage.setItem("habitTrackerData", JSON.stringify(habitData));
@@ -262,6 +415,11 @@
       const dates = getDateRange();
 
       habitOrder.forEach(habit => {
+        // Ensure proper structure
+        if (!habitData[habit] || typeof habitData[habit].dates !== "object") {
+          habitData[habit] = { dates: {}, icon: "" };
+        }
+        
         const card = document.createElement("div");
         card.className = "habit-card";
         card.setAttribute("draggable", "true");
@@ -271,19 +429,57 @@
         card.addEventListener("drop", dragDrop);
         card.addEventListener("dragend", dragEnd);
 
-        // Habit Header with Title & Right-Click Delete
+        // Habit Header with Icon, Title & Delete Icon
         const header = document.createElement("div");
         header.className = "habit-header";
+
+        const leftHeader = document.createElement("div");
+        leftHeader.className = "habit-header-left";
+
+        // Habit Icon (click to set/update)
+        const iconDiv = document.createElement("div");
+        iconDiv.className = "habit-icon";
+        iconDiv.onclick = function() {
+          editIconForHabit(habit);
+        };
+        // If the icon is an image URL (or Data URL), display an <img>; else, treat it as emoji.
+        if (habitData[habit].icon && (habitData[habit].icon.startsWith("http") || habitData[habit].icon.startsWith("data:"))) {
+          const img = document.createElement("img");
+          img.src = habitData[habit].icon;
+          img.alt = habit;
+          iconDiv.appendChild(img);
+        } else if (habitData[habit].icon) {
+          const span = document.createElement("span");
+          span.textContent = habitData[habit].icon;
+          iconDiv.appendChild(span);
+        } else {
+          // Default placeholder: first letter
+          const span = document.createElement("span");
+          span.textContent = habit.charAt(0).toUpperCase();
+          iconDiv.appendChild(span);
+        }
+        leftHeader.appendChild(iconDiv);
+
+        // Habit Title
         const title = document.createElement("div");
         title.className = "habit-title";
         title.textContent = habit;
-        title.addEventListener("contextmenu", function(e) {
-          e.preventDefault();
+        leftHeader.appendChild(title);
+
+        header.appendChild(leftHeader);
+
+        // Delete Icon
+        const deleteIcon = document.createElement("div");
+        deleteIcon.className = "habit-delete";
+        deleteIcon.title = "Delete Habit";
+        deleteIcon.textContent = "✖";
+        deleteIcon.onclick = function() {
           if (confirm("Delete habit '" + habit + "'?")) {
             deleteHabit(habit);
           }
-        });
-        header.appendChild(title);
+        };
+        header.appendChild(deleteIcon);
+
         card.appendChild(header);
 
         // Date Blocks for this habit
@@ -294,9 +490,11 @@
           block.className = "date-block";
           block.textContent = formatDateDisplay(date);
           const dateStr = formatDate(date);
-          if (habitData[habit][dateStr]) { block.classList.add("done"); }
+          if (habitData[habit].dates[dateStr]) { 
+            block.classList.add("done"); 
+          }
           block.addEventListener("click", function() {
-            habitData[habit][dateStr] = !habitData[habit][dateStr];
+            habitData[habit].dates[dateStr] = !habitData[habit].dates[dateStr];
             saveData();
             renderCards();
             renderGraph();
@@ -306,7 +504,7 @@
         card.appendChild(dateBlocks);
         container.appendChild(card);
       });
-      // After updating cards, update the graph.
+      // Update the graph after rendering cards.
       renderGraph();
     }
 
@@ -332,7 +530,7 @@
         const dateStr = formatDate(date);
         let count = 0;
         habitOrder.forEach(habit => {
-          if (habitData[habit][dateStr]) count++;
+          if (habitData[habit].dates[dateStr]) count++;
         });
         return count;
       });
@@ -384,17 +582,14 @@
       ctx.font = "12px Arial";
       ctx.textAlign = "center";
       if (currentView === "monthly") {
-        // For monthly view, display just day numbers...
         dates.forEach((date, i) => {
           const x = margin + i * pointSpacing;
           const label = date.getDate();
           ctx.fillText(label, x, canvas.height - 10);
         });
-        // ...and draw the month name at the far right.
         const monthName = dates[0].toLocaleDateString(undefined, { month: 'short' });
         ctx.fillText(monthName, margin + graphWidth, canvas.height - 25);
       } else {
-        // Weekly view: show full short labels.
         dates.forEach((date, i) => {
           const x = margin + i * pointSpacing;
           const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -451,7 +646,7 @@
       const input = document.getElementById("newHabitInput");
       const habitName = input.value.trim();
       if (habitName && !habitData[habitName]) {
-        habitData[habitName] = {};
+        habitData[habitName] = { dates: {}, icon: "" };
         habitOrder.push(habitName);
         input.value = "";
         saveData();
@@ -466,9 +661,95 @@
       saveData();
       renderCards();
     }
+    function editIconForHabit(habit) {
+      currentHabitForIcon = habit;
+      // Prepopulate modal inputs with current icon (if any)
+      const currentIcon = habitData[habit].icon || "";
+      if (currentIcon && (currentIcon.startsWith("http") || currentIcon.startsWith("data:"))) {
+        // Set Upload/Link tab active and prefill link input
+        setActiveModalTab("upload");
+        document.getElementById("modalLinkInput").value = currentIcon;
+        document.getElementById("modalEmojiInput").value = "";
+      } else if (currentIcon) {
+        // Assume it's an emoji
+        setActiveModalTab("emoji");
+        document.getElementById("modalEmojiInput").value = currentIcon;
+        document.getElementById("modalLinkInput").value = "";
+      } else {
+        // No icon set: default to emoji tab.
+        setActiveModalTab("emoji");
+        document.getElementById("modalEmojiInput").value = "";
+        document.getElementById("modalLinkInput").value = "";
+      }
+      // Also clear file input
+      document.getElementById("modalFileInput").value = "";
+      // Update modal header text
+      document.getElementById("modalHeader").textContent = "Set Icon for " + habit;
+      // Show the modal
+      document.getElementById("iconModal").style.display = "flex";
+    }
 
     /*************************************
-     * 8. Event Listeners for Controls   *
+     * 8. Modal Functionality             *
+     *************************************/
+    // Modal tab switching
+    document.getElementById("emojiTab").addEventListener("click", function() {
+      setActiveModalTab("emoji");
+    });
+    document.getElementById("uploadTab").addEventListener("click", function() {
+      setActiveModalTab("upload");
+    });
+    function setActiveModalTab(tab) {
+      if (tab === "emoji") {
+        document.getElementById("emojiTab").classList.add("active");
+        document.getElementById("uploadTab").classList.remove("active");
+        document.getElementById("emojiBody").classList.add("active");
+        document.getElementById("uploadBody").classList.remove("active");
+      } else {
+        document.getElementById("uploadTab").classList.add("active");
+        document.getElementById("emojiTab").classList.remove("active");
+        document.getElementById("uploadBody").classList.add("active");
+        document.getElementById("emojiBody").classList.remove("active");
+      }
+    }
+    // Modal Cancel Button
+    document.getElementById("modalCancelBtn").addEventListener("click", function() {
+      document.getElementById("iconModal").style.display = "none";
+    });
+    // Modal Save Button
+    document.getElementById("modalSaveBtn").addEventListener("click", function() {
+      // Determine active tab
+      const activeTab = document.querySelector(".modal-tabs button.active").id;
+      if (activeTab === "emojiTab") {
+        const emoji = document.getElementById("modalEmojiInput").value.trim();
+        habitData[currentHabitForIcon].icon = emoji;
+        saveData();
+        renderCards();
+        document.getElementById("iconModal").style.display = "none";
+      } else {
+        // For Upload/Link: check if a file was selected
+        const fileInput = document.getElementById("modalFileInput");
+        if (fileInput.files && fileInput.files[0]) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            habitData[currentHabitForIcon].icon = e.target.result;
+            saveData();
+            renderCards();
+            document.getElementById("iconModal").style.display = "none";
+          };
+          reader.readAsDataURL(fileInput.files[0]);
+        } else {
+          const link = document.getElementById("modalLinkInput").value.trim();
+          habitData[currentHabitForIcon].icon = link;
+          saveData();
+          renderCards();
+          document.getElementById("iconModal").style.display = "none";
+        }
+      }
+    });
+
+    /*************************************
+     * 9. Event Listeners for Controls   *
      *************************************/
     document.getElementById("weeklyViewBtn").addEventListener("click", function() {
       currentView = "weekly";
@@ -479,7 +760,41 @@
       renderCards();
     });
 
-    // Initial render
+    /*************************************
+     * 10. Drag & Drop Reordering         *
+     *************************************/
+    function dragStart(e) {
+      draggedCard = this;
+      this.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    }
+    function dragOver(e) {
+      e.preventDefault();
+      this.classList.add("drag-over");
+      return false;
+    }
+    function dragDrop(e) {
+      e.stopPropagation();
+      if (draggedCard !== this) {
+        const cards = Array.from(document.querySelectorAll(".habit-card"));
+        const fromIndex = cards.indexOf(draggedCard);
+        const toIndex = cards.indexOf(this);
+        if (fromIndex >= 0 && toIndex >= 0) {
+          habitOrder.splice(toIndex, 0, habitOrder.splice(fromIndex, 1)[0]);
+          saveData();
+          renderCards();
+        }
+      }
+      return false;
+    }
+    function dragEnd() {
+      this.classList.remove("dragging");
+      document.querySelectorAll(".habit-card").forEach(card => card.classList.remove("drag-over"));
+    }
+
+    /*************************************
+     * 11. Initial Render                *
+     *************************************/
     renderCards();
   </script>
 </body>
